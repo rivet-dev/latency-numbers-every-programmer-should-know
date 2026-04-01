@@ -1,36 +1,26 @@
-import { createClient } from "rivetkit/client";
+import { AgentOs } from "@rivet-dev/agent-os-core";
+import common from "@rivet-dev/agent-os-common";
 
-export interface AgentOsContext {
-  agent: any;
-}
+let cached: AgentOs | null = null;
 
-let cached: AgentOsContext | null = null;
+export async function setupAgentOs(): Promise<void> {
+  if (cached) return;
 
-export function getAgentOsContext(): AgentOsContext | null {
-  return cached;
-}
+  const vm = await AgentOs.create({ software: [common] });
 
-export async function setupAgentOs(): Promise<AgentOsContext> {
-  if (cached) return cached;
+  // Warm up (not measured)
+  await vm.exec("echo warmup");
 
-  const endpoint = process.env.AGENTOS_ENDPOINT;
-  if (!endpoint) throw new Error("AGENTOS_ENDPOINT env var required");
-
-  const client = createClient<any>(endpoint);
-  const agent = client.vm.getOrCreate(["latency-test"]);
-
-  // Warm up: first exec may involve VM creation (not measured)
-  await agent.exec("echo warmup");
-
-  cached = { agent };
-  return cached;
+  cached = vm;
 }
 
 export async function teardownAgentOs(): Promise<void> {
+  if (!cached) return;
+  await cached.dispose();
   cached = null;
 }
 
 export async function agentOsNativeExec(): Promise<void> {
   if (!cached) throw new Error("AgentOS not set up");
-  await cached.agent.exec("echo ok");
+  await cached.exec("echo ok");
 }
