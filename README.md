@@ -6,57 +6,41 @@ Measures round-trip latencies from AWS Lambda to sandbox providers and LLM infer
 
 - **Runtime:** AWS Lambda, Node.js 20.x, 3072 MB memory
 - **Region:** us-east-1
-- **Method:** Each test runs sequentially N times. Sandbox provisioning and agent installation are excluded from measurements. Sandboxes are created once and reused across samples.
+- **Method:** Each test runs sequentially N times. Sandbox exec/health tests reuse a pre-provisioned sandbox. Coldstart tests create and destroy a fresh sandbox each sample.
 
-## Results
+## Available tests
 
-10 samples per test. All values in milliseconds.
-
-### Sandbox Providers
-
-| Test | p50 | mean | min | max |
-|------|-----|------|-----|-----|
-| Daytona — native exec | 15 | 18 | 13 | 28 |
-| Daytona — Sandbox Agent health | 22 | 17 | 9 | 29 |
-| Daytona — Sandbox Agent exec | 26 | 27 | 23 | 36 |
-| E2B — Sandbox Agent health | 71 | 69 | 63 | 74 |
-| E2B — Sandbox Agent exec | 75 | 75 | 65 | 89 |
-| E2B — native exec | 79 | 79 | 70 | 97 |
-
-- **Native exec:** Run `echo ok` via the provider's own SDK (`sandbox.commands.run` for E2B, `sandbox.process.executeCommand` for Daytona).
-- **Sandbox Agent exec:** Run `echo ok` via [Sandbox Agent](https://sandboxagent.dev) `runProcess()` installed inside the sandbox.
-- **Sandbox Agent health:** `GET /v1/health` round-trip via Sandbox Agent SDK.
-
-### LLM Inference
-
-| Test | p50 | mean | min | max |
-|------|-----|------|-----|-----|
-| Anthropic (Haiku 4.5) | 521 | 653 | 372 | 1570 |
-| OpenAI (GPT-5 mini) | 1265 | 1116 | 750 | 1417 |
-| OpenRouter (Haiku 4.5) | 1166 | 1253 | 964 | 2559 |
-
-- **Prompt:** `"Hi"` with `max_tokens: 1` (Anthropic) or `max_completion_tokens: 16` (OpenAI/OpenRouter). Measures network round-trip + minimal inference, not generation speed.
+| Test | Description |
+|------|-------------|
+| `e2b:coldstart` | Create + destroy a fresh E2B sandbox |
+| `e2b:native-exec` | `echo ok` via E2B SDK |
+| `e2b:agent-exec` | `echo ok` via Sandbox Agent |
+| `e2b:agent-health` | `GET /v1/health` via Sandbox Agent |
+| `daytona:coldstart` | Create + destroy a fresh Daytona sandbox |
+| `daytona:native-exec` | `echo ok` via Daytona SDK |
+| `daytona:agent-exec` | `echo ok` via Sandbox Agent |
+| `daytona:agent-health` | `GET /v1/health` via Sandbox Agent |
+| `llm:anthropic` | Anthropic Haiku 4.5, `"Hi"`, max_tokens=1 |
+| `llm:openai` | OpenAI GPT-5 mini, `"Hi"`, max_completion_tokens=16 |
+| `llm:openrouter` | Haiku 4.5 via OpenRouter |
+| `llm:openrouter-openai` | GPT-5 mini via OpenRouter |
 
 ## Usage
 
-```
-GET /run?tests=*&samples=5
-GET /run?tests=llm:*&samples=10
-GET /run?tests=daytona:*,e2b:*&samples=3
-```
+```bash
+# JSON output
+./invoke.sh /run "tests=*&samples=5"
 
-### Available tests
+# CSV output (for Google Sheets)
+./invoke.sh /run "tests=*&samples=10&format=csv"
 
-`e2b:native-exec`, `e2b:agent-exec`, `e2b:agent-health`, `daytona:native-exec`, `daytona:agent-exec`, `daytona:agent-health`, `llm:anthropic`, `llm:openai`, `llm:openrouter`
+# Specific tests
+./invoke.sh /run "tests=e2b:coldstart,daytona:coldstart&samples=3"
+./invoke.sh /run "tests=llm:*&samples=10&format=csv"
+```
 
 ### Deploy
 
 ```bash
 ./deploy.sh
-```
-
-### Invoke
-
-```bash
-./invoke.sh /run "tests=*&samples=5"
 ```

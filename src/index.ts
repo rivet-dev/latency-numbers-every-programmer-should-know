@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { handle } from "hono/aws-lambda";
-import { ALL_TESTS, runTests, teardownAll } from "./runner.js";
+import { ALL_TESTS, runTests, teardownAll, toCSV } from "./runner.js";
 
 const app = new Hono();
 
@@ -24,6 +24,13 @@ app.get("/run", async (c) => {
       e2bSandboxId: e2bSandboxId || undefined,
       daytonaSandboxId: daytonaSandboxId || undefined,
     });
+
+    const format = c.req.query("format");
+    if (format === "csv") {
+      return c.text(toCSV(result), 200, {
+        "Content-Type": "text/csv",
+      });
+    }
     return c.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.stack ?? err.message : String(err);

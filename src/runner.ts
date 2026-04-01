@@ -4,28 +4,34 @@ import {
   teardownE2b,
   e2bNativeExec,
   getE2bContext,
+  e2bColdstart,
 } from "./sandboxes/e2b.js";
 import {
   setupDaytona,
   teardownDaytona,
   daytonaNativeExec,
   getDaytonaContext,
+  daytonaColdstart,
 } from "./sandboxes/daytona.js";
 import { agentExec, agentHealth } from "./sandboxes/shared.js";
 import { anthropicInference } from "./llm/anthropic.js";
 import { openaiInference } from "./llm/openai.js";
 import { openrouterInference } from "./llm/openrouter.js";
+import { openrouterOpenaiInference } from "./llm/openrouter-openai.js";
 
 export const ALL_TESTS = [
+  "e2b:coldstart",
   "e2b:native-exec",
   "e2b:agent-exec",
   "e2b:agent-health",
+  "daytona:coldstart",
   "daytona:native-exec",
   "daytona:agent-exec",
   "daytona:agent-health",
   "llm:anthropic",
   "llm:openai",
   "llm:openrouter",
+  "llm:openrouter-openai",
 ] as const;
 
 export type TestId = (typeof ALL_TESTS)[number];
@@ -60,12 +66,16 @@ function resolveTests(input: string): TestId[] {
 
 function getTestFn(testId: TestId): () => Promise<void> {
   switch (testId) {
+    case "e2b:coldstart":
+      return e2bColdstart;
     case "e2b:native-exec":
       return e2bNativeExec;
     case "e2b:agent-exec":
       return () => agentExec(getE2bContext()!.agentSdk);
     case "e2b:agent-health":
       return () => agentHealth(getE2bContext()!.agentSdk);
+    case "daytona:coldstart":
+      return daytonaColdstart;
     case "daytona:native-exec":
       return daytonaNativeExec;
     case "daytona:agent-exec":
@@ -78,6 +88,8 @@ function getTestFn(testId: TestId): () => Promise<void> {
       return openaiInference;
     case "llm:openrouter":
       return openrouterInference;
+    case "llm:openrouter-openai":
+      return openrouterOpenaiInference;
   }
 }
 
@@ -88,13 +100,18 @@ export async function runTests(
 ): Promise<RunResult> {
   const testIds = resolveTests(testsInput);
 
-  const needE2b = testIds.some((t) => t.startsWith("e2b:"));
-  const needDaytona = testIds.some((t) => t.startsWith("daytona:"));
-  // Setup sandboxes if needed (not timed)
+  // Coldstart tests don't need pre-setup, but exec/health tests do
+  const needE2bSetup = testIds.some(
+    (t) => t.startsWith("e2b:") && t !== "e2b:coldstart"
+  );
+  const needDaytonaSetup = testIds.some(
+    (t) => t.startsWith("daytona:") && t !== "daytona:coldstart"
+  );
+
   const setupPromises: Promise<void>[] = [];
-  if (needE2b)
+  if (needE2bSetup)
     setupPromises.push(setupE2b(opts?.e2bSandboxId).then(() => {}));
-  if (needDaytona)
+  if (needDaytonaSetup)
     setupPromises.push(setupDaytona(opts?.daytonaSandboxId).then(() => {}));
   await Promise.all(setupPromises);
 
@@ -131,6 +148,29 @@ export async function runTests(
     },
     results,
   };
+}
+
+export function toCSV(result: RunResult): string {
+  const testIds = Object.keys(result.results);
+  // Find max sample count
+  const maxSamples = Math.max(
+    ...testIds.map((t) => result.results[t].stats.samples.length)
+  );
+
+  // Header row
+  const lines = ["sample," + testIds.join(",")];
+
+  // Data rows — one per sample
+  for (let i = 0; i < maxSamples; i++) {
+    const row = [String(i + 1)];
+    for (const testId of testIds) {
+      const s = result.results[testId].stats.samples[i];
+      row.push(s !== undefined ? String(s) : "");
+    }
+    lines.push(row.join(","));
+  }
+
+  return lines.join("\n") + "\n";
 }
 
 export async function teardownAll(): Promise<void> {

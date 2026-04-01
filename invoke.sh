@@ -50,4 +50,10 @@ aws lambda invoke \
   --no-cli-pager \
   "$OUTFILE" >/dev/null 2>&1
 
-jq -r '.body' "$OUTFILE" | jq .
+# Output: if CSV format, print raw; otherwise pretty-print JSON
+BODY=$(jq -r '.body' "$OUTFILE")
+if [[ "$QS" == *"format=csv"* ]]; then
+  echo "$BODY"
+else
+  echo "$BODY" | jq .
+fi

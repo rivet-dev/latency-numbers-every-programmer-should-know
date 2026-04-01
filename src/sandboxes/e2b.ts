@@ -62,3 +62,8 @@ export async function e2bNativeExec(): Promise<void> {
   if (!cached) throw new Error("E2B not set up");
   await cached.sandbox.commands.run("echo ok");
 }
+
+export async function e2bColdstart(): Promise<void> {
+  const sandbox = await Sandbox.create({ timeoutMs: 60_000 });
+  await sandbox.kill();
+}

@@ -86,3 +86,16 @@ export async function daytonaNativeExec(): Promise<void> {
   if (!cached) throw new Error("Daytona not set up");
   await cached.sandbox.process.executeCommand("echo ok");
 }
+
+const daytonaClient = new Daytona({
+  apiKey: process.env.DAYTONA_API_KEY,
+  target: process.env.DAYTONA_TARGET ?? "us",
+});
+
+export async function daytonaColdstart(): Promise<void> {
+  const sandbox = await daytonaClient.create({
+    image: "ubuntu:22.04",
+    resources: { cpu: 1, memory: 2, disk: 5 },
+  });
+  await sandbox.delete();
+}
