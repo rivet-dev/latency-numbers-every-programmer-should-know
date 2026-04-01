@@ -7,12 +7,6 @@ const external = [
   ...builtinModules.map((m) => `node:${m}`),
   ...builtinModules.map((m) => `${m}/*`),
   "@aws-sdk/*",
-  // @secure-exec uses runtime require.resolve for polyfills + relative mock files.
-  // @rivet-dev packages read fixture files and WASM binaries relative to __dirname.
-  "@secure-exec/*",
-  "@rivet-dev/*",
-  // Needed to find the common software package at runtime
-  "@aspect-build/*",
 ];
 
 await build({
